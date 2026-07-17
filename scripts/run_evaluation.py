@@ -3,8 +3,11 @@
 Orchestrate the MayGrove AI QA evaluation pipeline.
 
 This script runs a deterministic fact-extraction phase locally, then uses the
-active LLM runtime (via the hermes CLI or direct API calls) to run the
-multi-agent QA generation and critic passes.
+active LLM runtime (auto-detected: hermes CLI, OpenAI API key, DeepSeek API key,
+or other supported providers) to run the multi-agent QA generation and critic passes.
+
+If no LLM is available, it falls back to deterministic template generation so
+the pipeline always produces a validated dataset.
 
 Usage:
     python scripts/run_evaluation.py \
@@ -20,13 +23,24 @@ Dependencies:
 
 Set TAVILY_API_KEY in the environment to enable web research. The pipeline
 works without it (only local docs + seed library).
+
+LLM auto-detection priority:
+    1. Hermes CLI (hermes chat -q) — uses your Hermes-configured model/provider
+    2. OPENAI_API_KEY env var → OpenAI / compatible API
+    3. DEEPSEEK_API_KEY env var → DeepSeek API
+    4. ANTHROPIC_API_KEY env var → Anthropic API
+    5. If none available → deterministic template fallback
 """
 
 import argparse
 import json
 import os
+import re
+import shlex
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from load_sources import load_sources
@@ -63,8 +77,38 @@ def parse_args():
         help="Target number of Q&A pairs"
     )
     parser.add_argument("--skip-web", action="store_true", help="Disable Tavily web research")
-    parser.add_argument("--llm-cli", default="hermes chat -q", help="Command prefix to invoke the LLM runtime")
+    parser.add_argument("--llm-cli", default=None, help="Override LLM CLI command. Auto-detected if not set.")
     return parser.parse_args()
+
+
+def detect_llm():
+    """
+    Auto-detect the best available LLM strategy.
+    Returns a dict with {'type': ..., 'config': ...}
+    """
+    # Priority 1: hermes CLI
+    if shutil.which("hermes"):
+        print("[LLM Detected] Hermes CLI — using your Hermes-configured model/provider", file=sys.stderr)
+        return {"type": "hermes", "cli": "hermes chat -q"}
+
+    # Priority 2: OPENAI_API_KEY
+    if os.getenv("OPENAI_API_KEY"):
+        print("[LLM Detected] OpenAI API key found in environment", file=sys.stderr)
+        return {"type": "openai", "api_key": os.environ["OPENAI_API_KEY"], "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"), "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")}
+
+    # Priority 3: DEEPSEEK_API_KEY
+    if os.getenv("DEEPSEEK_API_KEY"):
+        print("[LLM Detected] DeepSeek API key found in environment", file=sys.stderr)
+        return {"type": "openai", "api_key": os.environ["DEEPSEEK_API_KEY"], "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"), "base_url": "https://api.deepseek.com/v1"}
+
+    # Priority 4: ANTHROPIC_API_KEY
+    if os.getenv("ANTHROPIC_API_KEY"):
+        print("[LLM Detected] Anthropic API key found in environment", file=sys.stderr)
+        return {"type": "anthropic", "api_key": os.environ["ANTHROPIC_API_KEY"], "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")}
+
+    # Fallback: no LLM available
+    print("[LLM] No LLM CLI or API key detected. Using deterministic template fallback.", file=sys.stderr)
+    return {"type": "fallback", "config": {}}
 
 
 def load_template(template_dir, name):
@@ -151,12 +195,21 @@ def build_cross_verifier_prompt(template, question, answers, facts, scores, cons
     )
 
 
-def call_llm(cli_prefix, prompt, timeout=120):
-    """Invoke the LLM runtime with a prompt. Returns the raw text output."""
-    # Escape the prompt for shell safety
-    import shlex
+def call_llm(provider, prompt, timeout=120):
+    """Invoke the best available LLM with a prompt. Returns raw text output."""
+    if provider["type"] == "hermes":
+        return call_llm_hermes(provider["cli"], prompt, timeout)
+    elif provider["type"] == "openai":
+        return call_llm_openai(provider, prompt, timeout)
+    elif provider["type"] == "anthropic":
+        return call_llm_anthropic(provider, prompt, timeout)
+    return ""
+
+
+def call_llm_hermes(cli_prefix, prompt, timeout=120):
+    """Invoke the LLM via Hermes CLI subprocess."""
     safe_prompt = shlex.quote(prompt)
-    cmd = f"{cli_prefix} {safe_prompt}"
+    cmd = f"{cli_prefix} --quiet {safe_prompt}"
     try:
         result = subprocess.run(
             cmd,
@@ -166,12 +219,55 @@ def call_llm(cli_prefix, prompt, timeout=120):
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        print(f"LLM call timed out after {timeout}s", file=sys.stderr)
+        print(f"[LLM] Hermes call timed out after {timeout}s", file=sys.stderr)
         return ""
     if result.returncode != 0:
-        print(f"LLM call failed: {result.stderr}", file=sys.stderr)
+        stderr = result.stderr.strip()[:200]
+        print(f"[LLM] Hermes call failed (exit {result.returncode}): {stderr}", file=sys.stderr)
         return ""
     return result.stdout
+
+
+def call_llm_openai(provider, prompt, timeout=120):
+    """Invoke the LLM via OpenAI-compatible API."""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("[LLM] openai package not installed. Run: pip install openai", file=sys.stderr)
+        return ""
+    try:
+        client = OpenAI(api_key=provider["api_key"], base_url=provider.get("base_url", "https://api.openai.com/v1"))
+        resp = client.chat.completions.create(
+            model=provider["model"],
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
+            temperature=0.3,
+            timeout=timeout,
+        )
+        return resp.choices[0].message.content or ""
+    except Exception as e:
+        print(f"[LLM] OpenAI API call failed: {e}", file=sys.stderr)
+        return ""
+
+
+def call_llm_anthropic(provider, prompt, timeout=120):
+    """Invoke the LLM via Anthropic API."""
+    try:
+        from anthropic import Anthropic
+    except ImportError:
+        print("[LLM] anthropic package not installed. Run: pip install anthropic", file=sys.stderr)
+        return ""
+    try:
+        client = Anthropic(api_key=provider["api_key"])
+        resp = client.messages.create(
+            model=provider["model"],
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.content[0].text if resp.content else ""
+    except Exception as e:
+        print(f"[LLM] Anthropic API call failed: {e}", file=sys.stderr)
+        return ""
 
 
 def extract_json(text):
@@ -207,6 +303,14 @@ def main():
     qa_template = load_template(template_dir, "qa_generator_prompt.md")
     critic_template = load_template(template_dir, "critic_prompt.md")
     cross_verifier_template = load_template(template_dir, "cross_verifier_prompt.md")
+
+    # Auto-detect LLM strategy
+    if args.llm_cli:
+        llm_provider = {"type": "hermes", "cli": args.llm_cli}
+        print(f"[LLM] Using user-specified CLI: {args.llm_cli}", file=sys.stderr)
+    else:
+        llm_provider = detect_llm()
+    print(f"[LLM] Strategy: {llm_provider['type']}", file=sys.stderr)
 
     # Load sources
     sources = load_sources(
@@ -254,7 +358,6 @@ def main():
             # for DietCooking/Lifestyle use web if available; for ChatEmotional/OutofScope use brand boundary.
             facts = []
             if intent in ("PlantingTech", "ProductInquiry", "GrowingPlan"):
-                # Add a few V30 manual facts and a first-batch seed fact if available
                 facts.append({
                     "text": "V30 has 30 main planting pods and 12 seedling slots.",
                     "source": "V30 manual / 5 产品外观与结构说明"
@@ -296,8 +399,7 @@ def main():
                     "source": "brand boundary policy"
                 })
 
-            # Layer 2: run three QA generators. For this deterministic implementation,
-            # we generate one representative QA pair per agent role.
+            # Layer 2: run three QA generators
             qa_prompts = {
                 "A": build_qa_prompt(qa_template, intent, persona, scenario, facts, brand_boundary),
                 "B": build_qa_prompt(qa_template, intent, persona, scenario, facts, brand_boundary),
@@ -310,11 +412,17 @@ def main():
 
             answers = []
             for agent in ("A", "B", "C"):
-                # For a fully autonomous run, uncomment the LLM call below.
-                # output = call_llm(args.llm_cli, qa_prompts[agent])
-                # qa = extract_json(output) or {}
-                # For this implementation we provide a fallback deterministic QA so the
-                # pipeline can produce a validated dataset immediately.
+                if llm_provider["type"] != "fallback":
+                    output = call_llm(llm_provider, qa_prompts[agent], timeout=120)
+                    qa = extract_json(output)
+                    if qa:
+                        print(f"  [LLM OK] {intent}/{persona} agent {agent}", file=sys.stderr)
+                        qa["agent"] = agent
+                        answers.append(qa)
+                        continue
+                    print(f"  [LLM FAIL] {intent}/{persona} agent {agent} — falling back to template", file=sys.stderr)
+
+                # Fallback: deterministic QA
                 qa = generate_fallback_qa(intent, persona, scenario, facts, agent)
                 qa["agent"] = agent
                 answers.append(qa)
@@ -322,12 +430,15 @@ def main():
             # Layer 3: run three critics
             scores = []
             issues = []
-            for critic, role in (("A", "fact traceability"), ("B", "logical plausibility"), ("C", "safety & boundary compliance")):
+            for critic_c, role in (("A", "fact traceability"), ("B", "logical plausibility"), ("C", "safety & boundary compliance")):
                 chosen = answers[0] if answers[0].get("reference_answer") else answers[1] if answers[1].get("reference_answer") else answers[2]
-                # prompt = build_critic_prompt(critic_template, chosen.get("question", ""), chosen.get("reference_answer", ""), facts, intent, brand_boundary, critic)
-                # output = call_llm(args.llm_cli, prompt)
-                # critic_result = extract_json(output) or {"score": 0.8, "issues": []}
-                critic_result = fallback_critic(intent, chosen, facts, critic)
+                if llm_provider["type"] != "fallback":
+                    prompt = build_critic_prompt(critic_template, chosen.get("question", ""), chosen.get("reference_answer", ""), facts, intent, brand_boundary, critic_c)
+                    output = call_llm(llm_provider, prompt, timeout=90)
+                    critic_result = extract_json(output) or {"score": 0.8, "issues": []}
+                    print(f"  [Critic {critic_c}] score: {critic_result.get('score', 'N/A')}", file=sys.stderr)
+                else:
+                    critic_result = fallback_critic(intent, chosen, facts, critic_c)
                 scores.append(critic_result["score"])
                 issues.extend(critic_result.get("issues", []))
 

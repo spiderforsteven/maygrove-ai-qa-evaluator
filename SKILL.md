@@ -98,10 +98,11 @@ See [references/multi-agent-pipeline.md](references/multi-agent-pipeline.md) for
 See [references/intake-first-design-pattern.md](references/intake-first-design-pattern.md) for the general intake-first design pattern that applies to all evaluation-set skills.
 See [references/verification-gotchas.md](references/verification-gotchas.md) for common validation pitfalls and how to fix them (e.g., report-file schema relaxation, confidence/status alignment, Excel header matching).
 See [templates/fact_extractor_prompt.md](templates/fact_extractor_prompt.md), [templates/qa_generator_prompt.md](templates/qa_generator_prompt.md), [templates/critic_prompt.md](templates/critic_prompt.md), and [templates/cross_verifier_prompt.md](templates/cross_verifier_prompt.md) for reusable agent prompts.
-See [scripts/run_evaluation.py](scripts/run_evaluation.py) to run the full LLM-based pipeline end-to-end.
-See [scripts/generate_large_qa_set.py](scripts/generate_large_qa_set.py) for a deterministic, fact-grounded template generator that can produce 500–5000 items from the extracted source JSON without LLM calls.
+See [scripts/run_evaluation.py](scripts/run_evaluation.py) to run the 7-intent × 4-persona baseline evaluation set (default 28 items).
+See [scripts/generate_large_qa_set.py](scripts/generate_large_qa_set.py) for a deterministic, fact-grounded template generator that can produce 500–5000 PlantingTech-focused items from the extracted source JSON without LLM calls.
 See [scripts/load_sources.py](scripts/load_sources.py) to parse the source documents into structured JSON.
 See [scripts/validate_qa_outputs.py](scripts/validate_qa_outputs.py) to validate generated JSONL/CSV/Excel outputs before delivery.
+See [references/session-evidence-2026-07-17.md](references/session-evidence-2026-07-17.md) for a concrete 28-item run and output structure.
 
 ## Quick Start
 
@@ -330,6 +331,8 @@ Items with `verification_status != verified`, including the reason and the confl
 | User refuses intake / provides no sources | User says "不需要材料" or skips checklist | Output a warning: "Without sources, I can only generate speculative QA with high source_gap. Do you want to proceed?" If yes, mark all items as `source_gap` and lower confidence. |
 | User wants a different product | Not MayGrove | Restart intake: ask for product name, intents, personas, sources, and brand boundary. Do not use MayGrove defaults. |
 ### Output validation fails | `scripts/validate_qa_outputs.py` returns errors | Fix JSONL/CSV syntax or missing required fields, then re-run validation. If errors are on `cross_verification_report.jsonl` or `rejected_needs_review.jsonl`, only those two files need JSON validity and ID uniqueness; relax the strict full-schema check for report files (see script implementation). |
+| LLM auto-detection only works with Hermes CLI, OpenAI-compatible API, or Anthropic API | No API key or Hermes CLI available | The script prints a message and falls back to deterministic template generation. No additional setup needed. |
+| openai/anthropic package missing when using direct API | `ModuleNotFoundError` | `pip install openai anthropic` — these are optional dependencies; the script gracefully falls back to templates if the import fails. |
 | Web research returns low-quality sources | Tavily results are forums, e-commerce, or video-only | Reject web facts; mark as `source_gap` and route to rejected. |
 | Generated QA exceeds desired count | More than user-specified N | Sort by final_confidence descending and keep top N; move overflow to a separate overflow file. For deterministic template engines, generate a small buffer (e.g., 4% extra) then trim to exact count while keeping all verified items first. See [references/session-evidence-2026-07-16-v5.md](references/session-evidence-2026-07-16-v5.md). |
 | Template arity mismatch | Mixing 6-tuple and 7-tuple templates with `for q, a, ... in templates` | Ensure all template tuples have the same length; add an empty string for optional `source_gap` rather than omitting it. |
