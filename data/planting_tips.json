@@ -1,0 +1,80 @@
+[
+  {
+    "category": "Herbs",
+    "germination_tips": "• Keep grow media consistently moist but not saturated.\n• Maintain 65–75°F (18–24°C).\n• Use a humidity dome to improve germination rates.\n• Provide gentle light until sprouts emerge.",
+    "seedling_tips": "• Provide 14–16 hours of light daily.\n• Maintain moderate humidity and airflow.\n• Keep roots moist but avoid waterlogging.\n• Begin light feeding once true leaves appear.",
+    "vegetative_tips": "• Maintain steady nutrient levels and pH.\n• Harvest regularly to encourage new growth.\n• Ensure good airflow around foliage.\n• Remove damaged or yellowing leaves promptly.",
+    "harvest_tips": "• Harvest outer leaves first\n• Never remove more than 1/3 of plant",
+    "recommended_ec": "1.0–1.8",
+    "recommended_ph": "5.8–6.2",
+    "ppfd": "Germination: 50–100\n\nSeedling: 100–200\n\nVegetative: 200–400",
+    "light_hours": "14-16 hrs",
+    "example_plants": "Basil, Parsley, Chives, Rosemary, Peppermint, Lemon Balm, Catnip",
+    "difficulty": "中等"
+  },
+  {
+    "category": "Leafy Greens",
+    "germination_tips": "• Keep grow media evenly moist throughout germination.\n• Maintain 60–75°F (16–24°C).\n• Provide gentle light after emergence.\n• Avoid excessive heat during germination.\"",
+    "seedling_tips": "• Provide 12–14 hours of light daily.\n• Maintain steady moisture and airflow.\n• Thin crowded seedlings if necessary.\n• Begin balanced nutrients after true leaves develop.\"",
+    "vegetative_tips": "• Maintain cool temperatures when possible.\n• Monitor nutrient levels to support rapid leaf growth.\n• Remove damaged leaves regularly.\n• Prevent overcrowding to improve airflow.\"",
+    "harvest_tips": "• Harvest outer leaves first for continuous production.\n• Harvest entire heads when mature if desired.\n• Harvest before plants begin bolting.\n• Regular harvesting promotes continued growth.\"",
+    "recommended_ec": "0.8–1.6",
+    "recommended_ph": "5.8–6.2",
+    "ppfd": "\"Germination: 50–100\n\nSeedling: 150–250\n\nVegetative: 200–400\"",
+    "light_hours": "12-14 hrs",
+    "example_plants": "Lettuce, Kale, Swiss Chard, Pak Choi, Mustard, Arugula, Endive, Collards, Amaranth",
+    "difficulty": "简单"
+  },
+  {
+    "category": "Fruiting Vegetables",
+    "germination_tips": "\"• Maintain 70–80°F (21–27°C) for best germination.\n• Keep media consistently moist.\n• Use humidity domes to retain moisture.\n• Provide warmth for uniform sprouting.\"",
+    "seedling_tips": "\"• Provide 14–16 hours of strong light daily.• Ensure good airflow to strengthen stems.\n• Begin balanced feeding after true leaves appear.\n• Avoid temperature fluctuations.\"",
+    "vegetative_tips": "\"• Increase nutrient availability as plants grow.\n• Support plants with stakes, clips, or trellises.\n• Maintain consistent watering and pH.\n• Remove unhealthy foliage and monitor flowering.\"",
+    "harvest_tips": "\"• Harvest fruits when fully developed and properly colored.\n• Pick regularly to encourage continued production.\n• Support heavy fruit clusters when needed.\n• Handle fruits carefully to avoid bruising.\"",
+    "recommended_ec": "1.8–3.0",
+    "recommended_ph": "5.8–6.3",
+    "ppfd": "\"Germination: 50–100\n\nSeedling: 200–300\n\nVegetative: 400–700\"",
+    "light_hours": "14-18 hrs",
+    "example_plants": "Tomato, Pepper, Eggplant, Cucumber",
+    "difficulty": "高"
+  },
+  {
+    "category": "Root Crops",
+    "germination_tips": "\"• Keep media evenly moist during germination.\n• Maintain 55–75°F (13–24°C).\n• Avoid drying out the root zone.\n• Ensure adequate depth for root development.\"",
+    "seedling_tips": "\"• Provide strong light immediately after emergence.\n• Avoid disturbing developing roots.\n• Maintain steady moisture levels.\n• Monitor spacing to prevent crowding.\"",
+    "vegetative_tips": "\"• Maintain consistent nutrient and moisture levels.\n• Avoid rapid environmental fluctuations.\n• Support healthy root expansion with adequate space.\n• Remove weak or crowded plants if necessary.\"",
+    "harvest_tips": "\"• Harvest promptly when roots reach desired size.\n• Delayed harvest may reduce quality.\n• Remove media carefully when harvesting.\n• Store harvested roots in a cool environment.\"",
+    "recommended_ec": "1.2–2.0",
+    "recommended_ph": "5.8–6.4",
+    "ppfd": "\"Germination: 50–100\n\nSeedling: 150–250\n\nVegetative:250–500\"",
+    "light_hours": "12–16 hrs",
+    "example_plants": "Radish",
+    "difficulty": "简单"
+  },
+  {
+    "category": "Flowers",
+    "germination_tips": "\"• Maintain 65–80°F (18–27°C).\n• Keep media moist until emergence.\n• Provide bright indirect light after sprouting.\n• Ensure adequate humidity during germination.\"",
+    "seedling_tips": "\"• Provide 14–16 hours of light daily.\n• Maintain balanced moisture and airflow.\n• Avoid overfeeding young seedlings.\n• Promote strong stem development with airflow.\"",
+    "vegetative_tips": "\"• Maintain balanced nutrients for foliage and blooms.\n• Remove damaged leaves and spent flowers when appropriate.\n• Ensure adequate light intensity.\n• Support taller varieties if necessary.\"",
+    "harvest_tips": "\"• Harvest blooms at peak appearance.\n• Remove spent flowers to encourage additional blooming when applicable.\n• Handle flowers carefully to avoid damage.\n• Harvest during cooler periods of the day when possible.\"",
+    "recommended_ec": "1.2–2.0",
+    "recommended_ph": "5.8–6.5",
+    "ppfd": "\"Germination: 50–100\n\nSeedling: 150–300\n\nVegetative: 300–600\"",
+    "light_hours": "14–16 hrs",
+    "example_plants": "Sunflower",
+    "difficulty": "中等"
+  },
+  {
+    "category": "Legumes",
+    "germination_tips": "\"• Keep media evenly moist during germination.\n• Maintain 60–75°F (16–24°C).\n• Ensure adequate oxygen around developing roots.\n• Avoid excessive moisture buildup.\"",
+    "seedling_tips": "\"• Provide 12–16 hours of light daily.\n• Begin balanced feeding after true leaves appear.\n• Provide support for climbing varieties early.\n• Maintain steady moisture.\"",
+    "vegetative_tips": "\"• Install trellises or supports before vigorous growth begins.\n• Maintain consistent nutrients and pH.\n• Encourage airflow around foliage.\n• Monitor pod development closely.\"",
+    "harvest_tips": "\"• Harvest pods regularly to encourage continued production.\n• Pick pods at preferred maturity stage.\n• Avoid damaging stems during harvest.\n• Frequent harvesting improves overall yield.\"",
+    "recommended_ec": "1.2–2.0",
+    "recommended_ph": "5.8–6.3",
+    "ppfd": "\"Germination: 50–100\n\nSeedling: 150–250\n\nVegetative: 300–600\"",
+    "light_hours": "14–16 hrs",
+    "example_plants": "Pea / Bean",
+    "difficulty": "高"
+  }
+]

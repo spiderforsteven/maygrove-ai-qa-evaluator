@@ -1,0 +1,20 @@
+{
+  "id": "mg-000",
+  "intent": "PlantingTech",
+  "persona": "Newbie",
+  "question": "User's natural English question",
+  "reference_answer": "Reference answer in English, using only the provided facts and citing sources",
+  "facts": [
+    {
+      "text": "Atomic fact in source language or English",
+      "source": "section or URL"
+    }
+  ],
+  "confidence": 0.9,
+  "tags": ["tag1", "tag2"],
+  "verification_status": "verified",
+  "verification_confidence": 0.9,
+  "verification_notes": "Notes from the Critic Agent",
+  "issues": [],
+  "source_gap": "无缺口"
+}
