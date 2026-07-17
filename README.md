@@ -109,22 +109,19 @@ flowchart TD
 #### 方式 A：直接复制到本地技能目录
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/spiderforsteven/maygrove-ai-qa-evaluator.git
+git clone https://github.com/spiderforsteven/maygrove-ai-qa-evaluator.git && cp -r maygrove-ai-qa-evaluator ~/.hermes/skills/maygrove-ai-qa-evaluator
+```
 
-# 2. 复制到 Hermes 技能目录（假设你的 HERMES_HOME 是 ~/.hermes）
-cp -r maygrove-ai-qa-evaluator ~/.hermes/skills/maygrove-ai-qa-evaluator
+然后在 Hermes 会话中加载：
 
-# 3. 在 Hermes 会话中加载
+```text
 /skill maygrove-ai-qa-evaluator
 ```
 
 #### 方式 B：通过 Hermes skills tap 添加仓库（需要 Hermes 支持）
 
 ```bash
-hermes skills tap add spiderforsteven/maygrove-ai-qa-evaluator
-hermes skills list
-hermes skills install maygrove-ai-qa-evaluator
+hermes skills tap add spiderforsteven/maygrove-ai-qa-evaluator && hermes skills install maygrove-ai-qa-evaluator
 ```
 
 > 如果 `hermes skills tap` 命令不可用，请使用方式 A 手动复制。
