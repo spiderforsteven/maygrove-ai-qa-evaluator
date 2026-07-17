@@ -3,8 +3,8 @@
 Orchestrate the MayGrove AI QA evaluation pipeline.
 
 This script runs a deterministic fact-extraction phase locally, then uses the
-active LLM runtime (auto-detected: hermes CLI, OpenAI API key, DeepSeek API key,
-or other supported providers) to run the multi-agent QA generation and critic passes.
+active LLM runtime (auto-detected from common API keys and CLI tools) to run
+the multi-agent QA generation and critic passes.
 
 If no LLM is available, it falls back to deterministic template generation so
 the pipeline always produces a validated dataset.
@@ -24,12 +24,21 @@ Dependencies:
 Set TAVILY_API_KEY in the environment to enable web research. The pipeline
 works without it (only local docs + seed library).
 
-LLM auto-detection priority:
-    1. Hermes CLI (hermes chat -q) — uses your Hermes-configured model/provider
-    2. OPENAI_API_KEY env var → OpenAI / compatible API
-    3. DEEPSEEK_API_KEY env var → DeepSeek API
-    4. ANTHROPIC_API_KEY env var → Anthropic API
-    5. If none available → deterministic template fallback
+LLM auto-detection checks these in order (first match wins):
+    • OPENAI_API_KEY or OPENAI_BASE_URL set → OpenAI-compatible API
+    • ANTHROPIC_API_KEY set → Anthropic API
+    • DEEPSEEK_API_KEY set → DeepSeek API
+    • OPENROUTER_API_KEY set → OpenRouter API
+    • GEMINI_API_KEY or GOOGLE_API_KEY set → Google Gemini API
+    • TOGETHER_API_KEY set → Together AI API
+    • GROQ_API_KEY set → Groq API
+    • XAI_API_KEY set → xAI / Grok API
+    • hermes CLI on PATH → Hermes Agent subprocess
+    • claude CLI on PATH → Claude Code subprocess
+    • ollama CLI on PATH → local Ollama instance
+    • None of the above → deterministic template fallback (no API key needed)
+
+Override with --llm-cli to force a specific CLI command.
 """
 
 import argparse
@@ -84,30 +93,67 @@ def parse_args():
 def detect_llm():
     """
     Auto-detect the best available LLM strategy.
+    Checks common API keys first, then CLI tools, then falls back to templates.
     Returns a dict with {'type': ..., 'config': ...}
     """
-    # Priority 1: hermes CLI
-    if shutil.which("hermes"):
-        print("[LLM Detected] Hermes CLI — using your Hermes-configured model/provider", file=sys.stderr)
-        return {"type": "hermes", "cli": "hermes chat -q"}
+    providers = [
+        ("OPENAI_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        }),
+        ("ANTHROPIC_API_KEY", "anthropic", lambda k: {
+            "api_key": k, "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+        }),
+        ("DEEPSEEK_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+            "base_url": "https://api.deepseek.com/v1"
+        }),
+        ("OPENROUTER_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("OPENROUTER_MODEL", "openrouter/auto"),
+            "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        }),
+        ("GEMINI_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"
+        }),
+        ("GOOGLE_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("GOOGLE_MODEL", "gemini-2.0-flash"),
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"
+        }),
+        ("TOGETHER_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("TOGETHER_MODEL", "mistralai/Mixtral-8x22B-Instruct-v0.1"),
+            "base_url": "https://api.together.xyz/v1"
+        }),
+        ("GROQ_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            "base_url": "https://api.groq.com/openai/v1"
+        }),
+        ("XAI_API_KEY", "openai", lambda k: {
+            "api_key": k, "model": os.getenv("XAI_MODEL", "grok-2-latest"),
+            "base_url": "https://api.x.ai/v1"
+        }),
+    ]
 
-    # Priority 2: OPENAI_API_KEY
-    if os.getenv("OPENAI_API_KEY"):
-        print("[LLM Detected] OpenAI API key found in environment", file=sys.stderr)
-        return {"type": "openai", "api_key": os.environ["OPENAI_API_KEY"], "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"), "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")}
+    # Priority 1: API keys (most direct, least overhead)
+    for env_var, provider_type, config_fn in providers:
+        key = os.getenv(env_var)
+        if key:
+            print(f"[LLM] Detected {env_var} → {provider_type}", file=sys.stderr)
+            return {"type": provider_type, **config_fn(key)}
 
-    # Priority 3: DEEPSEEK_API_KEY
-    if os.getenv("DEEPSEEK_API_KEY"):
-        print("[LLM Detected] DeepSeek API key found in environment", file=sys.stderr)
-        return {"type": "openai", "api_key": os.environ["DEEPSEEK_API_KEY"], "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"), "base_url": "https://api.deepseek.com/v1"}
+    # Priority 2: CLI tools (Hermes, Claude Code, Ollama)
+    cli_tools = [
+        ("hermes", "hermes chat -q --quiet", "Hermes Agent (uses your configured model)"),
+        ("claude", "claude -p", "Claude Code CLI"),
+        ("ollama", "ollama run llama3.2", "local Ollama instance"),
+    ]
+    for binary, cmd, desc in cli_tools:
+        if shutil.which(binary):
+            print(f"[LLM] Detected CLI: {binary} — {desc}", file=sys.stderr)
+            return {"type": "cli", "cmd": f"{cmd} "}
 
-    # Priority 4: ANTHROPIC_API_KEY
-    if os.getenv("ANTHROPIC_API_KEY"):
-        print("[LLM Detected] Anthropic API key found in environment", file=sys.stderr)
-        return {"type": "anthropic", "api_key": os.environ["ANTHROPIC_API_KEY"], "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")}
-
-    # Fallback: no LLM available
-    print("[LLM] No LLM CLI or API key detected. Using deterministic template fallback.", file=sys.stderr)
+    # Priority 3: Fallback — no LLM available
+    print("[LLM] No API key or supported CLI found. Using deterministic template fallback.", file=sys.stderr)
     return {"type": "fallback", "config": {}}
 
 
@@ -197,8 +243,10 @@ def build_cross_verifier_prompt(template, question, answers, facts, scores, cons
 
 def call_llm(provider, prompt, timeout=120):
     """Invoke the best available LLM with a prompt. Returns raw text output."""
-    if provider["type"] == "hermes":
-        return call_llm_hermes(provider["cli"], prompt, timeout)
+    if provider["type"] in ("hermes", "cli"):
+        # "hermes" provides .cli (hermes chat -q), "cli" provides .cmd (generic CLI command)
+        cmd = provider.get("cli") or provider.get("cmd", "")
+        return call_llm_cli(cmd, prompt, timeout)
     elif provider["type"] == "openai":
         return call_llm_openai(provider, prompt, timeout)
     elif provider["type"] == "anthropic":
@@ -206,10 +254,10 @@ def call_llm(provider, prompt, timeout=120):
     return ""
 
 
-def call_llm_hermes(cli_prefix, prompt, timeout=120):
-    """Invoke the LLM via Hermes CLI subprocess."""
+def call_llm_cli(cmd_prefix, prompt, timeout=120):
+    """Invoke any CLI tool with a prompt via subprocess."""
     safe_prompt = shlex.quote(prompt)
-    cmd = f"{cli_prefix} --quiet {safe_prompt}"
+    cmd = f"{cmd_prefix} {safe_prompt}"
     try:
         result = subprocess.run(
             cmd,
@@ -306,7 +354,7 @@ def main():
 
     # Auto-detect LLM strategy
     if args.llm_cli:
-        llm_provider = {"type": "hermes", "cli": args.llm_cli}
+        llm_provider = {"type": "cli", "cmd": args.llm_cli}
         print(f"[LLM] Using user-specified CLI: {args.llm_cli}", file=sys.stderr)
     else:
         llm_provider = detect_llm()

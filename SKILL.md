@@ -109,6 +109,7 @@ See [references/session-evidence-2026-07-17.md](references/session-evidence-2026
 ```bash
 pip install -r scripts/requirements.txt
 
+# LLM is auto-detected from env vars or CLI tools — just run:
 python scripts/run_evaluation.py \
   --maygrove-md /path/to/Maygrove.md \
   --v30-manual /path/to/MayGrove_Verti_30__V30__使用说明书.md \
@@ -117,12 +118,26 @@ python scripts/run_evaluation.py \
   --count 30 \
   --skip-web
 
+# The script auto-detects which LLM to use:
+#   • OPENAI_API_KEY → OpenAI / compatible
+#   • ANTHROPIC_API_KEY → Anthropic
+#   • DEEPSEEK_API_KEY → DeepSeek
+#   • OPENROUTER_API_KEY → OpenRouter
+#   • GEMINI_API_KEY / GOOGLE_API_KEY → Gemini
+#   • TOGETHER_API_KEY → Together AI
+#   • GROQ_API_KEY → Groq
+#   • XAI_API_KEY → xAI / Grok
+#   • hermes CLI → Hermes Agent (your configured model)
+#   • claude CLI → Claude Code
+#   • ollama CLI → local Ollama
+#   • none of the above → deterministic template fallback
+
 python scripts/validate_qa_outputs.py ./maygrove-qa-output
 ```
 
 ## Notes on the Implementation
 
-- `run_evaluation.py` includes both a deterministic fallback generator and LLM-call hooks for the 3×3×3 agents. If no LLM CLI is configured, the fallback produces a validated dataset from the loaded sources so the pipeline is always runnable.
+- `run_evaluation.py` auto-detects the user's LLM at runtime (priority: Hermes CLI → OpenAI API key → DeepSeek API key → Anthropic API key), and falls back to deterministic template generation if none is available. The pipeline always produces a validated dataset regardless of LLM availability.
 - `generate_large_qa_set.py` is a fully deterministic, template-driven generator for 500–5000 item sets. It is the preferred path when the user asks for large counts (e.g., 1000), because it preserves source citations and avoids LLM hallucination in general-knowledge areas. It expects `sources.json` produced by `load_sources.py`.
 - The `data/` directory contains pre-extracted `seed_library_first_batch.json`, `seed_nutrition.json`, and `planting_tips.json` derived from the seed library Excel. These can be used for fast fact lookups without re-parsing the Excel file.
 - If the user wants **more than 28 items**, expand by adding scenario variations per intent (e.g., water-level, vacation-mode, seedling-transplant) rather than duplicating the same 7×4 grid. The 50-item run on 2026-07-16 used this pattern successfully; see [references/session-evidence-2026-07-16-v4.md](references/session-evidence-2026-07-16-v4.md).
